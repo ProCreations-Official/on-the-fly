@@ -248,28 +248,34 @@ class MCPToolGenerator:
     def analyze_prompt(self, prompt: str) -> Dict[str, Any]:
         """Analyze user prompt to determine what tools to generate"""
         analysis_prompt = f"""
-Analyze this user request and determine what specific tools need to be created to complete it.
+Analyze this user request and determine what REAL MCP tools need to be created to perform ACTUAL actions.
 
 User request: "{prompt}"
+
+Focus on creating tools that DO REAL THINGS like:
+- File operations (create, read, write files)
+- Web requests (download content, API calls)  
+- System commands (run programs, create directories)
+- Data processing (manipulate real data)
 
 You must return ONLY a JSON object with this exact structure:
 {{
     "custom_tools": [
         {{
             "name": "specific_tool_name",
-            "description": "exactly what this tool does",
+            "description": "exactly what real action this tool performs",
             "parameters": {{"param_name": "param_type"}}
         }}
     ]
 }}
 
-Create 1-3 specific tools that would be needed to complete this exact request. Be very specific about what each tool should do.
+Examples of REAL MCP tools:
+- For "create a website": create "html_file_creator" tool that writes actual HTML files
+- For "download data": create "web_downloader" tool that fetches and saves content
+- For "write code to file": create "code_file_writer" tool that creates actual .py files
+- For "make me happy": create "happiness_webpage_creator" tool that creates a real HTML happiness page
 
-Examples:
-- For "solve 2+2": create a "math_calculator" tool
-- For "write python code": create a "code_generator" tool  
-- For "search for info": create a "web_searcher" tool
-- For "convert units": create a "unit_converter" tool
+Create 1-2 tools that perform ACTUAL ACTIONS for: "{prompt}"
 
 JSON response:"""
         
@@ -338,40 +344,68 @@ JSON response:"""
     def generate_custom_tool(self, tool_spec: Dict[str, Any]) -> str:
         """Generate a custom tool based on specification"""
         generation_prompt = f"""
-Create a Python function tool based on this specification:
+Create a REAL MCP tool that can perform actual actions, not just return text.
+
+Tool Specification:
 Name: {tool_spec['name']}
 Description: {tool_spec['description']}
 Parameters: {tool_spec.get('parameters', {})}
 
-Requirements:
+CRITICAL REQUIREMENTS for REAL MCP tools:
 1. Use the @tool decorator from smolagents
-2. Include proper type hints with descriptions in docstring
-3. Add comprehensive docstring with parameter descriptions
-4. Handle errors gracefully
-5. Return meaningful results
+2. Perform ACTUAL actions (file operations, web requests, system commands, etc.)
+3. Use real Python functions like open(), os.makedirs(), requests.get(), subprocess.run()
+4. Create, modify, or interact with the real filesystem and external services
+5. Return status messages about what was actually accomplished
 
-Example format:
+Available modules: os, subprocess, requests, json, math, datetime, open(), print()
+
+Examples of REAL MCP tools:
 ```python
 @tool
-def my_tool(input_param: str) -> str:
+def create_html_file(filename: str, content: str) -> str:
     '''
-    Brief description of what the tool does.
+    Create an actual HTML file on the filesystem.
     
     Args:
-        input_param: Description of the input parameter
+        filename: Name of the HTML file to create
+        content: HTML content to write to the file
     
     Returns:
-        Description of what is returned
+        Success message with file path
     '''
     try:
-        # Implementation here
-        result = f"Processed: {{input_param}}"
-        return result
+        with open(filename, 'w') as f:
+            f.write(content)
+        full_path = os.path.abspath(filename)
+        return f"Successfully created HTML file: {{full_path}}"
     except Exception as e:
-        return f"Error: {{str(e)}}"
+        return f"Error creating file: {{str(e)}}"
+
+@tool
+def download_web_content(url: str, filename: str) -> str:
+    '''
+    Download content from a URL and save to file.
+    
+    Args:
+        url: URL to download from
+        filename: Local filename to save to
+    
+    Returns:
+        Success message with details
+    '''
+    try:
+        import requests
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+        return f"Downloaded {{len(response.text)}} characters to {{filename}}"
+    except Exception as e:
+        return f"Error downloading: {{str(e)}}"
 ```
 
-Generate the complete function code:
+Now generate a REAL MCP tool for: {tool_spec['name']}
 """
         
         try:
@@ -478,11 +512,16 @@ class AdaptiveAgent:
                     clean_code = clean_code.replace("from smolagents import tool\n", "")
                 if "import re" in clean_code:
                     clean_code = clean_code.replace("import re\n", "")
+                if "import os" in clean_code:
+                    clean_code = clean_code.replace("import os\n", "")
                 
-                # Create a clean namespace with required imports
+                # Create a clean namespace with required imports and REAL capabilities
                 import re
                 import math
                 import json
+                import os
+                import subprocess
+                import datetime
                 
                 try:
                     import requests
@@ -504,6 +543,10 @@ class AdaptiveAgent:
                     "math": math,
                     "json": json,
                     "requests": requests,
+                    "os": os,
+                    "subprocess": subprocess,
+                    "datetime": datetime,
+                    "open": open,  # Enable file operations
                 }
                 
                 # Execute the cleaned generated code
@@ -515,8 +558,15 @@ class AdaptiveAgent:
                     if (callable(obj) and 
                         hasattr(obj, '__name__') and 
                         not name.startswith('_') and 
-                        name not in ['tool', 'print', 'str', 'int', 'float', 'len', 'range', 'list', 'dict']):
-                        self.available_tools.append(obj)
+                        name not in ['tool', 'print', 'str', 'int', 'float', 'len', 'range', 'list', 'dict', 'open', 'os', 'subprocess', 'datetime', 'requests', 'json', 'math', 're']):
+                        # Check if it's already decorated with @tool or needs decoration
+                        if hasattr(obj, '__wrapped__') or hasattr(obj, '_is_tool'):
+                            self.available_tools.append(obj)
+                        else:
+                            # Apply @tool decorator if not already applied
+                            decorated_obj = tool(obj)
+                            self.available_tools.append(decorated_obj)
+                        
                         if not silent:
                             print(f"✅ Generated tool: {name}")
                         tool_found = True
@@ -532,10 +582,102 @@ class AdaptiveAgent:
         if not silent:
             print(f"Generated {len(self.available_tools)} AI tools for this task")
     
+    def _handle_file_operations(self, user_prompt: str, silent: bool = False):
+        """Handle requests that require real file operations"""
+        if not silent:
+            print("🔧 Detected file operation request - using real MCP tools")
+        
+        # Use AI to generate code that performs real file operations
+        generation_prompt = f"""
+Generate Python code that performs the requested file operation and actually executes it.
+
+User request: "{user_prompt}"
+
+Requirements:
+1. Use real Python file operations (open(), with statements, etc.)
+2. Actually CREATE, WRITE, or MODIFY files on the filesystem
+3. Return a success message with the full file path
+4. Handle errors gracefully
+
+Example for creating an HTML file:
+```python
+html_content = '''<!DOCTYPE html>
+<html><head><title>Example</title></head>
+<body><h1>Hello World</h1></body></html>'''
+
+try:
+    with open('example.html', 'w') as f:
+        f.write(html_content)
+    import os
+    full_path = os.path.abspath('example.html')
+    result = f"Successfully created file: {{full_path}}"
+except Exception as e:
+    result = f"Error: {{str(e)}}"
+
+print(result)
+```
+
+Generate Python code for: {user_prompt}
+"""
+        
+        try:
+            response = self.model_provider.generate([
+                {"role": "system", "content": "You are an expert Python programmer. Generate working code that performs real file operations."},
+                {"role": "user", "content": generation_prompt}
+            ])
+            
+            # Extract and execute the code
+            import re
+            code_match = re.search(r'```python\n(.*?)\n```', response, re.DOTALL)
+            if code_match:
+                code = code_match.group(1)
+            else:
+                code = response
+            
+            if not silent:
+                print(f"Generated file operation code:\n{code}")
+            
+            # Execute the code directly (not in smolagents sandbox)
+            import os
+            import datetime
+            import json
+            
+            # Create safe execution environment
+            exec_globals = {
+                'open': open,
+                'os': os,
+                'datetime': datetime,
+                'json': json,
+                'print': print,
+                '__builtins__': __builtins__,
+            }
+            
+            # Capture the output
+            from io import StringIO
+            import sys
+            old_stdout = sys.stdout
+            sys.stdout = captured_output = StringIO()
+            
+            try:
+                exec(code, exec_globals)
+                output = captured_output.getvalue()
+                return output.strip() if output.strip() else "File operation completed successfully"
+            except Exception as e:
+                return f"Error executing file operation: {str(e)}"
+            finally:
+                sys.stdout = old_stdout
+                
+        except Exception as e:
+            return f"Error generating file operation code: {str(e)}"
+    
     def run(self, user_prompt: str, silent: bool = False, **kwargs):
         """Main entry point to run the agent using real AI only"""
         # Generate tools dynamically for this specific task
         self.prepare_for_task(user_prompt, silent=silent)
+        
+        # Check if this requires file operations and handle specially
+        if any(word in user_prompt.lower() for word in ['create', 'file', 'save', 'write', 'download', 'generate']):
+            return self._handle_file_operations(user_prompt, silent=silent)
         
         # Create a proper model wrapper for smolagents
         class WorkingModelWrapper(Model):
