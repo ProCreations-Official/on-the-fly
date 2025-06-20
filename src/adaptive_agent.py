@@ -551,17 +551,33 @@ class AdaptiveAgent:
                         role_str = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
                         
                         # Map smolagents roles to OpenAI-compatible roles
+                        original_role = role_str
                         if role_str == "tool-response":
                             role_str = "user"  # Tool responses become user messages
+                        elif role_str == "tool-call":
+                            role_str = "assistant"  # Tool calls become assistant messages
+                        elif role_str == "tool":
+                            role_str = "user"  # Tool messages become user messages
                         elif role_str not in ["system", "assistant", "user"]:
                             role_str = "user"  # Default unknown roles to user
+                        
+                        # Debug: print role mapping in non-silent mode
+                        if original_role != role_str and not kwargs.get('silent', False):
+                            print(f"Role mapping: {original_role} -> {role_str}")
                         
                         provider_messages.append({
                             "role": role_str,
                             "content": msg.content
                         })
                     elif isinstance(msg, dict):
-                        provider_messages.append(msg)
+                        # Handle dict messages
+                        role = msg.get("role", "user")
+                        if role not in ["system", "assistant", "user"]:
+                            role = "user"
+                        provider_messages.append({
+                            "role": role,
+                            "content": msg.get("content", str(msg))
+                        })
                     else:
                         provider_messages.append({
                             "role": "user", 
