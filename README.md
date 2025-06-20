@@ -1,6 +1,15 @@
-# 🤖 Adaptive Agent - Dynamic MCP Tool Generator
+# 🤖 On-The-Fly Adaptive Agent
 
-A complete AI agent that dynamically generates MCP (Model Context Protocol) tools on the fly to adapt to any task. Features a **beautiful, modern CLI interface** with rich colors, progress bars, and elegant panels.
+[![GitHub Stars](https://img.shields.io/github/stars/ProCreations-Official/on-the-fly?style=for-the-badge&logo=github&color=yellow)](https://github.com/ProCreations-Official/on-the-fly/stargazers)
+[![License](https://img.shields.io/github/license/ProCreations-Official/on-the-fly?style=for-the-badge&color=blue)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python)](https://python.org)
+[![Rich CLI](https://img.shields.io/badge/CLI-Rich%20%26%20Beautiful-brightgreen?style=for-the-badge)](https://github.com/Textualize/rich)
+
+A **revolutionary AI agent** that dynamically generates MCP (Model Context Protocol) tools on-the-fly for any task. Features a **beautiful, modern CLI interface** with rich colors, progress bars, and elegant panels.
+
+> 🎯 **No hardcoded tools** - Everything is generated fresh using real AI!  
+> ⚡ **Multi-provider support** - Works with any AI model  
+> 🎨 **Beautiful interface** - Modern terminal UI experience
 
 ## ✨ Features
 
